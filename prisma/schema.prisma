@@ -1,0 +1,67 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Transaction {
+  id             String   @id @default(uuid())
+  phoneNumber    String
+  country        String
+  operator       String
+  amount         Float
+  currency       String
+  status         String
+  type           String
+  paymentMethod  String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model AdminUser {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  passwordHash String
+  role         String
+  createdAt    DateTime @default(now())
+}
+
+model ActivityLog {
+  id           String   @id @default(uuid())
+  phoneNumber  String
+  action       String
+  metadata     Json
+  createdAt    DateTime @default(now())
+}
+
+model DailyStatistic {
+  id             String   @id @default(uuid())
+  date           DateTime
+  country        String
+  totalTopups    Int
+  totalAmount    Float
+  totalRefunded  Float
+  createdAt      DateTime @default(now())
+}
+
+model NewsPost {
+  id            String   @id @default(uuid())
+  title         String
+  slug          String   @unique
+  content       String
+  thumbnailUrl  String
+  publishedAt   DateTime?
+  isPublished   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
