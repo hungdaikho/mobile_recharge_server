@@ -99,4 +99,64 @@
 - **Endpoint:** `/activity-logs`
 - **Query:**
   - `phoneNumber`, `date`, `page`, `limit`
-- **Mô tả:** Lấy danh sách nhật ký hoạt động, hỗ trợ lọc và phân trang. 
+- **Mô tả:** Lấy danh sách nhật ký hoạt động, hỗ trợ lọc và phân trang.
+
+---
+
+## 7. Nhà mạng (Operator)
+### Lấy danh sách nhà mạng
+- **Phương thức:** GET
+- **Endpoint:** `/operators`
+- **Mô tả:** Lấy danh sách tất cả nhà mạng, bao gồm thông tin quốc gia và các loại sim.
+
+### Tạo nhà mạng (Yêu cầu đăng nhập)
+- **Phương thức:** POST
+- **Endpoint:** `/operators`
+- **Body:**
+  - `name` (string): Tên nhà mạng
+  - `logoUrl` (string): Link logo
+  - `apiCode` (string): Mã code tích hợp API
+  - `countryCode` (string): Mã quốc gia
+- **Mô tả:** Tạo mới một nhà mạng.
+
+### Cập nhật nhà mạng (Yêu cầu đăng nhập)
+- **Phương thức:** PUT
+- **Endpoint:** `/operators/:id`
+- **Body:**
+  - Các trường cần cập nhật (name, logoUrl, apiCode, countryCode, ...)
+- **Mô tả:** Cập nhật thông tin nhà mạng.
+
+### Xóa nhà mạng (Yêu cầu đăng nhập)
+- **Phương thức:** DELETE
+- **Endpoint:** `/operators/:id`
+- **Mô tả:** Xóa một nhà mạng.
+
+---
+
+## 8. Quốc gia (Country)
+### Lấy danh sách quốc gia
+- **Phương thức:** GET
+- **Endpoint:** `/countries`
+- **Mô tả:** Lấy danh sách tất cả quốc gia, bao gồm thông tin nhà mạng.
+
+### Tạo quốc gia (Yêu cầu đăng nhập)
+- **Phương thức:** POST
+- **Endpoint:** `/countries`
+- **Body:**
+  - `code` (string): Mã quốc gia
+  - `name` (string): Tên quốc gia
+  - `currency` (string): Đơn vị tiền tệ
+  - `flagUrl` (string): Link cờ quốc gia
+- **Mô tả:** Tạo mới một quốc gia.
+
+### Cập nhật quốc gia (Yêu cầu đăng nhập)
+- **Phương thức:** PUT
+- **Endpoint:** `/countries/:code`
+- **Body:**
+  - Các trường cần cập nhật (name, currency, flagUrl, ...)
+- **Mô tả:** Cập nhật thông tin quốc gia.
+
+### Xóa quốc gia (Yêu cầu đăng nhập)
+- **Phương thức:** DELETE
+- **Endpoint:** `/countries/:code`
+- **Mô tả:** Xóa một quốc gia. 
