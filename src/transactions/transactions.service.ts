@@ -1,18 +1,15 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { PrismaClient, Transaction, ActivityLog } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBulkTransactionDto, TopupItem, SupportedCurrency } from './dto/create-bulk-transaction.dto';
+import { CreateTransactionDto } from './dto/create-transaction.dto';
 import Stripe from 'stripe';
 
 @Injectable()
 export class TransactionsService implements OnModuleInit {
-  private prisma = new PrismaClient();
   private stripe: Stripe;
   private readonly logger = new Logger(TransactionsService.name);
 
-  constructor(
-    private prismaService: PrismaService
-  ) {}
+  constructor(private readonly prismaService: PrismaService) {}
 
   async onModuleInit() {
     // Get Stripe credentials from database when module initializes
@@ -36,56 +33,6 @@ export class TransactionsService implements OnModuleInit {
   private async mockTelcoApi(phoneNumber: string): Promise<'success' | 'failed'> {
     // Simulate API call with 80% success rate
     return Math.random() > 0.2 ? 'success' : 'failed';
-  }
-
-  private async logActivity(phoneNumber: string, action: string, metadata: any): Promise<ActivityLog> {
-    return this.prisma.activityLog.create({
-      data: {
-        phoneNumber,
-        action,
-        metadata,
-      },
-    });
-  }
-
-  async createTransaction(data: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'> & { status?: string }): Promise<Transaction> {
-    // 1. Tạo transaction với status pending nếu chưa có
-    const transaction = await this.prisma.transaction.create({ data: { ...data, status: data.status || 'pending' } });
-    // 2. Gọi telco API (mock)
-    const telcoResult = await this.mockTelcoApi(data.phoneNumber);
-    // 3. Cập nhật status
-    const updated = await this.prisma.transaction.update({
-      where: { id: transaction.id },
-      data: { status: telcoResult },
-    });
-    // 4. Ghi log
-    await this.logActivity(transaction.phoneNumber, 'topup', { transactionId: transaction.id, status: telcoResult });
-    // 5. Trả về transaction đã cập nhật
-    return updated;
-  }
-
-  async getTransactions({ date, country, status, operator, page = 1, limit = 20, sort = 'createdAt', order = 'desc' }: any) {
-    const where: any = {};
-    if (date) {
-      const d = new Date(date);
-      where.createdAt = {
-        gte: new Date(d.setHours(0, 0, 0, 0)),
-        lt: new Date(d.setHours(24, 0, 0, 0)),
-      };
-    }
-    if (country) where.country = country;
-    if (status) where.status = status;
-    if (operator) where.operator = operator;
-    const [items, total] = await Promise.all([
-      this.prisma.transaction.findMany({
-        where,
-        skip: (page - 1) * limit,
-        take: limit,
-        orderBy: { [sort]: order },
-      }),
-      this.prisma.transaction.count({ where }),
-    ]);
-    return { items, total, page, limit };
   }
 
   private async handleTopupFailure(paymentIntentId: string, phoneNumber: string, amount: number) {
@@ -236,7 +183,7 @@ export class TransactionsService implements OnModuleInit {
         const amount = amounts[i];
 
         try {
-          // Attempt to perform topup (mock for now)
+          // Attempt to perform topup
           const topupResult = await this.mockTelcoApi(phoneNumber);
           
           if (topupResult === 'failed') {
@@ -315,5 +262,81 @@ export class TransactionsService implements OnModuleInit {
       signature,
       stripeCredential.apiSecret
     );
+  }
+
+  async createTransaction(data: CreateTransactionDto) {
+    try {
+      // 1. Tạo transaction với status pending nếu chưa có
+      const transaction = await this.prismaService.transaction.create({ 
+        data: { 
+          phoneNumber: data.phoneNumber,
+          country: data.country,
+          operator: data.operator,
+          amount: data.amount,
+          currency: data.currency,
+          status: data.status || 'PENDING',
+          type: 'TOPUP',
+          paymentMethod: data.paymentMethod || 'DIRECT',
+        } 
+      });
+
+      // 2. Gọi telco API (mock)
+      const telcoResult = await this.mockTelcoApi(data.phoneNumber);
+
+      // 3. Cập nhật status
+      const updated = await this.prismaService.transaction.update({
+        where: { id: transaction.id },
+        data: { status: telcoResult },
+      });
+
+      // 4. Ghi log
+      await this.prismaService.activityLog.create({
+        data: {
+          phoneNumber: transaction.phoneNumber,
+          action: 'TOPUP',
+          metadata: { 
+            transactionId: transaction.id, 
+            status: telcoResult 
+          }
+        }
+      });
+
+      // 5. Trả về transaction đã cập nhật
+      return updated;
+    } catch (error) {
+      this.logger.error('Error creating transaction:', error);
+      throw error;
+    }
+  }
+
+  async getTransactions({ date, country, status, operator, page = 1, limit = 20, sort = 'createdAt', order = 'desc' }: any) {
+    try {
+      const where: any = {};
+      if (date) {
+        const d = new Date(date);
+        where.createdAt = {
+          gte: new Date(d.setHours(0, 0, 0, 0)),
+          lt: new Date(d.setHours(24, 0, 0, 0)),
+        };
+      }
+      if (country) where.country = country;
+      if (status) where.status = status;
+      if (operator) where.operator = operator;
+
+      const [items, total] = await Promise.all([
+        this.prismaService.transaction.findMany({
+          where,
+          skip: (page - 1) * limit,
+          take: limit,
+          orderBy: { [sort]: order },
+        }),
+        this.prismaService.transaction.count({ where }),
+      ]);
+
+      return { items, total, page, limit };
+    } catch (error) {
+      this.logger.error('Error getting transactions:', error);
+      throw error;
+    }
   }
 }
