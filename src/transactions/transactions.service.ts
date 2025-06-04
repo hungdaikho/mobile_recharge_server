@@ -1,13 +1,33 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBulkTransactionDto, TopupItem, SupportedCurrency } from './dto/create-bulk-transaction.dto';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { UnsupportedCurrencyException, AmountLimitExceededException, StripeCredentialNotFoundException, TransactionException } from './exceptions/transaction.exception';
 import Stripe from 'stripe';
 
 @Injectable()
 export class TransactionsService implements OnModuleInit {
   private stripe: Stripe;
   private readonly logger = new Logger(TransactionsService.name);
+
+  // Currency configuration
+  private readonly CURRENCY_CONFIG = {
+    [SupportedCurrency.VND]: {
+      maxAmount: 50000000, // 50M VND
+      stripeMultiplier: 1, // VND doesn't use decimal
+      symbol: '₫'
+    },
+    [SupportedCurrency.USD]: {
+      maxAmount: 500, // $500
+      stripeMultiplier: 100, // cents
+      symbol: '$'
+    },
+    [SupportedCurrency.EUR]: {
+      maxAmount: 450, // €450
+      stripeMultiplier: 100, // cents
+      symbol: '€'
+    }
+  };
 
   constructor(private readonly prismaService: PrismaService) {}
 
@@ -22,7 +42,7 @@ export class TransactionsService implements OnModuleInit {
     });
 
     if (!stripeCredential) {
-      throw new Error('Stripe credentials not found in database');
+      throw new StripeCredentialNotFoundException();
     }
 
     this.stripe = new Stripe(stripeCredential.apiSecret, {
@@ -77,10 +97,19 @@ export class TransactionsService implements OnModuleInit {
   async createBulkTransactionWithStripe(dto: CreateBulkTransactionDto) {
     // Validate total amount
     const totalAmount = dto.topups.reduce((sum, item) => sum + item.amount, 0);
-    const MAX_TOTAL_AMOUNT = dto.currency === SupportedCurrency.VND ? 50000000 : 500; // 50M VND or $500 USD
     
-    if (totalAmount > MAX_TOTAL_AMOUNT) {
-      throw new Error(`Total amount exceeds maximum limit of ${MAX_TOTAL_AMOUNT} ${dto.currency}`);
+    // Get currency configuration
+    const currencyConfig = this.CURRENCY_CONFIG[dto.currency];
+    if (!currencyConfig) {
+      throw new UnsupportedCurrencyException(dto.currency);
+    }
+    
+    if (totalAmount > currencyConfig.maxAmount) {
+      throw new AmountLimitExceededException(
+        totalAmount, 
+        currencyConfig.maxAmount, 
+        `${currencyConfig.symbol}${dto.currency}`
+      );
     }
 
     try {
@@ -94,18 +123,21 @@ export class TransactionsService implements OnModuleInit {
       });
 
       if (!stripeCredential) {
-        throw new Error('Stripe credentials not found or inactive');
+        throw new StripeCredentialNotFoundException();
       }
+
+      // Convert amount to smallest currency unit for Stripe
+      const stripeAmount = totalAmount * currencyConfig.stripeMultiplier;
 
       // Create payment intent with Stripe
       const paymentIntent = await this.stripe.paymentIntents.create({
-        amount: totalAmount,
+        amount: stripeAmount,
         currency: dto.currency.toLowerCase(),
         payment_method_types: ['card'],
         metadata: {
           type: 'BULK_TOPUP',
           phoneNumbers: dto.topups.map(t => t.phoneNumber).join(','),
-          amounts: dto.topups.map(t => t.amount).join(',') // Store individual amounts for refund
+          amounts: dto.topups.map(t => t.amount).join(',')
         }
       });
 
@@ -151,8 +183,11 @@ export class TransactionsService implements OnModuleInit {
         transactions: transactions
       };
     } catch (error) {
+      if (error instanceof TransactionException) {
+        throw error;
+      }
       this.logger.error('Error creating bulk transaction:', error);
-      throw error;
+      throw new TransactionException('Failed to create transaction', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
