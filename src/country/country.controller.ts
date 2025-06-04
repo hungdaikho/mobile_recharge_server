@@ -1,32 +1,32 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { CountryService } from './country.service';
-
-// Placeholder guard, thay bằng guard thực tế của bạn
-const AuthGuard = () => (target: any, key?: any, descriptor?: any) => descriptor;
+import { AuthGuard } from '../auth/auth.guard';
+import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('countries')
 export class CountryController {
   constructor(private readonly countryService: CountryService) {}
 
+  @Public()
   @Get()
   async findAll() {
     return this.countryService.findAll();
   }
 
   @Post()
-  @UseGuards(AuthGuard())
+  @UseGuards(AuthGuard)
   async create(@Body() data: any) {
     return this.countryService.create(data);
   }
 
   @Put(':code')
-  @UseGuards(AuthGuard())
+  @UseGuards(AuthGuard)
   async update(@Param('code') code: string, @Body() data: any) {
     return this.countryService.update(code, data);
   }
 
   @Delete(':code')
-  @UseGuards(AuthGuard())
+  @UseGuards(AuthGuard)
   async delete(@Param('code') code: string) {
     return this.countryService.delete(code);
   }

@@ -82,6 +82,8 @@ model Operator {
   countryCode  String
   country      Country   @relation(fields: [countryCode], references: [code])
   simTypes     SimType[]
+  description  String?
+  color String?
 }
 
 model SimType {
@@ -89,4 +91,17 @@ model SimType {
   name        String
   operatorId  String
   operator    Operator @relation(fields: [operatorId], references: [id])
+}
+
+model ApiCredential {
+  id          String   @id @default(uuid())
+  name        String   @unique // Tên của credential (ví dụ: "Reloadly", "Stripe")
+  type        String   // Loại credential (ví dụ: "PAYMENT", "TOPUP")
+  apiKey      String   // API key
+  apiSecret   String   // API secret
+  baseUrl     String?  // Base URL của API (nếu có)
+  isActive    Boolean  @default(true)
+  metadata    Json?    // Lưu thêm các thông tin khác nếu cần
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

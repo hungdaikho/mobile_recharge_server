@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaClient, DailyStatistic } from '@prisma/client';
+import { PrismaClient, DailyStatistic, Transaction, Prisma } from '@prisma/client';
+import { StatisticsQueryDto, GroupBy } from './dto/statistics-query.dto';
 
 @Injectable()
 export class StatisticsService {
@@ -62,5 +63,74 @@ export class StatisticsService {
     if (date) where.date = new Date(date);
     if (country) where.country = country;
     return this.prisma.dailyStatistic.findMany({ where, orderBy: { date: 'desc' } });
+  }
+
+  async getSummary(query: StatisticsQueryDto) {
+    const { startDate, endDate, country, operator } = query;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    const where: any = {
+      createdAt: {
+        gte: start,
+        lte: end,
+      },
+      type: 'topup',
+    };
+
+    if (country) where.country = country;
+    if (operator) where.operator = operator;
+
+    const [totalTransactions, totalAmount, totalRefunded] = await Promise.all([
+      this.prisma.transaction.count({ where }),
+      this.prisma.transaction.aggregate({
+        where,
+        _sum: { amount: true },
+      }),
+      this.prisma.transaction.aggregate({
+        where: { ...where, type: 'refund' },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    return {
+      totalTransactions,
+      totalAmount: totalAmount._sum.amount || 0,
+      totalRefunded: totalRefunded._sum.amount || 0,
+      netAmount: (totalAmount._sum.amount || 0) - (totalRefunded._sum.amount || 0),
+    };
+  }
+
+  async getOperators(query: StatisticsQueryDto) {
+    const { startDate, endDate, country } = query;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    const where: any = {
+      createdAt: {
+        gte: start,
+        lte: end,
+      },
+      type: 'topup',
+    };
+
+    if (country) where.country = country;
+
+    const operators = await this.prisma.transaction.groupBy({
+      by: ['operator'],
+      where,
+      _count: {
+        operator: true,
+      },
+      _sum: {
+        amount: true,
+      },
+    });
+
+    return operators.map(op => ({
+      operator: op.operator,
+      totalTransactions: op._count.operator,
+      totalAmount: op._sum.amount || 0,
+    }));
   }
 } 

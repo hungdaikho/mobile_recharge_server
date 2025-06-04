@@ -9,16 +9,29 @@ import { StatisticsModule } from './statistics/statistics.module';
 import { NewsModule } from './news/news.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { CountryModule } from './country/country.module';
+import { OperatorModule } from './operator/operator.module';
+import { PrismaModule } from './prisma/prisma.module';
+import { ApiCredentialsModule } from './api-credentials/api-credentials.module';
 
 @Module({
   imports: [
     ThrottlerModule.forRoot([
       {
         ttl: 60000, // 60 giây
-        limit: 10, // 10 requests mỗi 60 giây cho mỗi IP
+        limit: 400, // 10 requests mỗi 60 giây cho mỗi IP
       },
     ]),
-    TransactionsModule, AdminModule, AuthModule, ActivityLogModule, StatisticsModule, NewsModule
+    PrismaModule,
+    TransactionsModule,
+    AdminModule,
+    AuthModule,
+    ActivityLogModule,
+    StatisticsModule,
+    NewsModule,
+    CountryModule,
+    OperatorModule,
+    ApiCredentialsModule
   ],
   controllers: [AppController],
   providers: [
@@ -29,4 +42,4 @@ import { APP_GUARD } from '@nestjs/core';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

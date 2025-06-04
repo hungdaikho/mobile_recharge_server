@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { NewsService } from './news.service';
 import { AuthGuard } from '../auth/auth.guard';
+import { Public } from '../auth/decorators/public.decorator';
 
 class NewsDto {
   title: string;
@@ -15,12 +16,13 @@ class NewsDto {
 export class NewsController {
   constructor(private readonly newsService: NewsService) {}
 
-  // Public API
+  @Public()
   @Get()
   async getAll(@Query('isPublished') isPublished?: string) {
     return this.newsService.getAll({ isPublished: isPublished === 'true' ? true : undefined });
   }
 
+  @Public()
   @Get(':slug')
   async getBySlug(@Param('slug') slug: string) {
     return this.newsService.getBySlug(slug);
