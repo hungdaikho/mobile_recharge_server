@@ -69,6 +69,65 @@
   - Theo định nghĩa CreateTransactionDto (số điện thoại, nhà mạng, mệnh giá, ...)
 - **Mô tả:** Tạo giao dịch nạp tiền.
 
+### Tạo giao dịch nạp tiền hàng loạt qua Stripe
+- **Phương thức:** POST
+- **Endpoint:** `/transactions/stripe/create-payment`
+- **Body:**
+  ```json
+  {
+    "topups": [
+      {
+        "phoneNumber": "0986001234",
+        "amount": 50000
+      },
+      {
+        "phoneNumber": "0986005678",
+        "amount": 100000
+      }
+    ],
+    "country": "VN",
+    "operator": "VIETTEL",
+    "currency": "VND"
+  }
+  ```
+- **Giới hạn:**
+  - Số lượng số điện thoại: 1-10 số/lần
+  - Số tiền tối thiểu: 10,000 VND hoặc $0.1 USD
+  - Số tiền tối đa mỗi số: 10M VND hoặc $100 USD
+  - Tổng số tiền tối đa: 50M VND hoặc $500 USD
+  - Tiền tệ hỗ trợ: VND, USD
+- **Response:**
+  ```json
+  {
+    "clientSecret": "pi_xxx_secret_xxx",
+    "paymentIntentId": "pi_xxx",
+    "transactions": [
+      {
+        "id": "uuid",
+        "phoneNumber": "0986001234",
+        "amount": 50000,
+        "status": "PENDING",
+        // ... other transaction fields
+      }
+    ]
+  }
+  ```
+- **Mô tả:** Tạo giao dịch nạp tiền hàng loạt và khởi tạo thanh toán qua Stripe.
+
+### Webhook Stripe
+- **Phương thức:** POST
+- **Endpoint:** `/transactions/stripe/webhook`
+- **Headers:**
+  - `stripe-signature`: Chữ ký xác thực từ Stripe
+- **Mô tả:** Webhook nhận kết quả thanh toán từ Stripe. Xử lý:
+  - Khi thanh toán thành công:
+    + Cập nhật trạng thái transaction thành SUCCESS
+    + Thực hiện nạp tiền
+    + Nếu nạp tiền thất bại, tự động hoàn tiền (refund)
+  - Khi thanh toán thất bại:
+    + Cập nhật trạng thái transaction thành FAILED
+    + Ghi log thất bại
+
 ### Lấy danh sách giao dịch (Yêu cầu đăng nhập)
 - **Phương thức:** GET
 - **Endpoint:** `/transactions`

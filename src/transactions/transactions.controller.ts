@@ -1,8 +1,10 @@
-import { Controller, Post, Body, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, UseGuards, Headers, RawBodyRequest, Req } from '@nestjs/common';
 import { TransactionsService } from './transactions.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiQuery } from '@nestjs/swagger';
+import { CreateBulkTransactionDto } from './dto/create-bulk-transaction.dto';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiQuery, ApiHeader } from '@nestjs/swagger';
+import { Request } from 'express';
 /**
  * Tạo giao dịch nạp tiền
  * - Nhận thông tin giao dịch từ frontend
@@ -52,5 +54,39 @@ export class TransactionsController {
     @Query('order') order: 'asc' | 'desc' = 'desc',
   ) {
     return this.transactionsService.getTransactions({ date, country, status, operator, page, limit, sort, order });
+  }
+
+  @ApiOperation({ summary: 'Tạo giao dịch nạp tiền hàng loạt qua Stripe' })
+  @ApiBody({ type: CreateBulkTransactionDto })
+  @Post('stripe/create-payment')
+  async createStripePayment(@Body() dto: CreateBulkTransactionDto) {
+    return this.transactionsService.createBulkTransactionWithStripe(dto);
+  }
+
+  @ApiOperation({ summary: 'Webhook nhận kết quả thanh toán từ Stripe' })
+  @ApiHeader({ name: 'stripe-signature', required: true })
+  @Post('stripe/webhook')
+  async handleStripeWebhook(
+    @Headers('stripe-signature') signature: string,
+    @Req() request: RawBodyRequest<Request>
+  ) {
+    const payload = request.rawBody;
+    
+    if (!payload) {
+      throw new Error('No payload received');
+    }
+
+    try {
+      const event = await this.transactionsService.constructWebhookEvent(
+        payload,
+        signature
+      );
+      
+      await this.transactionsService.handleStripeWebhook(event);
+      return { received: true };
+    } catch (err) {
+      console.error('Webhook Error:', err.message);
+      throw new Error(`Webhook Error: ${err.message}`);
+    }
   }
 }
