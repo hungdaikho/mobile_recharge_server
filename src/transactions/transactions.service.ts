@@ -4,10 +4,11 @@ import { CreateBulkTransactionDto, TopupItem, SupportedCurrency } from './dto/cr
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UnsupportedCurrencyException, AmountLimitExceededException, StripeCredentialNotFoundException, TransactionException } from './exceptions/transaction.exception';
 import Stripe from 'stripe';
+import { UpdateTransactionDto } from './dto/update-transaction.dto';
 
 @Injectable()
 export class TransactionsService implements OnModuleInit {
-  private stripe: Stripe;
+  private stripe: Stripe | undefined;
   private readonly logger = new Logger(TransactionsService.name);
 
   // Currency configuration
@@ -32,22 +33,37 @@ export class TransactionsService implements OnModuleInit {
   constructor(private readonly prismaService: PrismaService) {}
 
   async onModuleInit() {
-    // Get Stripe credentials from database when module initializes
-    const stripeCredential = await this.prismaService.apiCredential.findFirst({
-      where: {
-        name: 'Stripe',
-        type: 'PAYMENT',
-        isActive: true
+    try {
+      // Initialize stripe if credentials exist
+      const stripeCredential = await this.prismaService.apiCredential.findFirst({
+        where: {
+          name: 'Stripe',
+          type: 'PAYMENT',
+          isActive: true
+        }
+      });
+
+      if (!stripeCredential) {
+        this.logger.warn('Stripe credentials not found or inactive');
+        return;
       }
-    });
 
-    if (!stripeCredential) {
-      throw new StripeCredentialNotFoundException();
+      if (!stripeCredential.apiSecret) {
+        this.logger.error('Stripe API secret is empty');
+        return;
+      }
+
+      this.stripe = new Stripe(stripeCredential.apiSecret, {
+        apiVersion: '2025-05-28.basil'
+      });
+
+      // Verify Stripe connection
+      await this.stripe.balance.retrieve();
+      this.logger.log('Stripe initialized successfully');
+    } catch (error) {
+      this.logger.error('Failed to initialize Stripe:', error);
+      this.stripe = undefined;
     }
-
-    this.stripe = new Stripe(stripeCredential.apiSecret, {
-      apiVersion: '2025-05-28.basil'
-    });
   }
 
   private async mockTelcoApi(phoneNumber: string): Promise<'success' | 'failed'> {
@@ -57,6 +73,9 @@ export class TransactionsService implements OnModuleInit {
 
   private async handleTopupFailure(paymentIntentId: string, phoneNumber: string, amount: number) {
     try {
+      if (!this.stripe) {
+        throw new StripeCredentialNotFoundException();
+      }
       // Create refund
       const refund = await this.stripe.refunds.create({
         payment_intent: paymentIntentId,
@@ -95,6 +114,11 @@ export class TransactionsService implements OnModuleInit {
   }
 
   async createBulkTransactionWithStripe(dto: CreateBulkTransactionDto) {
+    // Check if Stripe is initialized
+    if (!this.stripe) {
+      throw new StripeCredentialNotFoundException();
+    }
+
     // Validate total amount
     const totalAmount = dto.topups.reduce((sum, item) => sum + item.amount, 0);
     
@@ -113,19 +137,6 @@ export class TransactionsService implements OnModuleInit {
     }
 
     try {
-      // Get latest Stripe credentials
-      const stripeCredential = await this.prismaService.apiCredential.findFirst({
-        where: {
-          name: 'Stripe',
-          type: 'PAYMENT',
-          isActive: true
-        }
-      });
-
-      if (!stripeCredential) {
-        throw new StripeCredentialNotFoundException();
-      }
-
       // Convert amount to smallest currency unit for Stripe
       const stripeAmount = totalAmount * currencyConfig.stripeMultiplier;
 
@@ -280,6 +291,9 @@ export class TransactionsService implements OnModuleInit {
 
   // Helper method to construct Stripe webhook event
   async constructWebhookEvent(payload: string | Buffer, signature: string) {
+    if (!this.stripe) {
+      throw new StripeCredentialNotFoundException();
+    }
     const stripeCredential = await this.prismaService.apiCredential.findFirst({
       where: {
         name: 'Stripe',
@@ -371,6 +385,45 @@ export class TransactionsService implements OnModuleInit {
       return { items, total, page, limit };
     } catch (error) {
       this.logger.error('Error getting transactions:', error);
+      throw error;
+    }
+  }
+
+  async updateTransaction(id: string, data: UpdateTransactionDto) {
+    try {
+      // Check if transaction exists
+      const transaction = await this.prismaService.transaction.findUnique({
+        where: { id }
+      });
+
+      if (!transaction) {
+        throw new TransactionException('Transaction not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Update transaction status
+      const updated = await this.prismaService.transaction.update({
+        where: { id },
+        data: {
+          status: data.status
+        }
+      });
+
+      // Log the update
+      await this.prismaService.activityLog.create({
+        data: {
+          phoneNumber: transaction.phoneNumber,
+          action: 'UPDATE_TRANSACTION_STATUS',
+          metadata: {
+            transactionId: id,
+            oldStatus: transaction.status,
+            newStatus: data.status
+          }
+        }
+      });
+
+      return updated;
+    } catch (error) {
+      this.logger.error(`Error updating transaction ${id}:`, error);
       throw error;
     }
   }

@@ -18,10 +18,4 @@ export class StatisticsController {
   async getOperators(@Query() query: StatisticsQueryDto) {
     return this.statisticsService.getOperators(query);
   }
-
-  @UseGuards(AuthGuard)
-  @Post('generate')
-  async generate() {
-    return this.statisticsService.generateDailyStats();
-  }
 } 

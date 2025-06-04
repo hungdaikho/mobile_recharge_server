@@ -1,81 +1,23 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaClient, DailyStatistic, Transaction, Prisma } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { StatisticsQueryDto, GroupBy } from './dto/statistics-query.dto';
 
 @Injectable()
 export class StatisticsService {
   private prisma = new PrismaClient();
 
-  async generateDailyStats(date: Date = new Date()): Promise<DailyStatistic[]> {
-    // Lấy danh sách country
-    const countries = await this.prisma.transaction.findMany({
-      distinct: ['country'],
-      select: { country: true },
-    });
-    const stats: DailyStatistic[] = [];
-    for (const { country } of countries) {
-      const start = new Date(date);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(date);
-      end.setHours(24, 0, 0, 0);
-      const totalTopups = await this.prisma.transaction.count({
-        where: { country, createdAt: { gte: start, lt: end }, type: 'topup' },
-      });
-      const totalAmount = await this.prisma.transaction.aggregate({
-        where: { country, createdAt: { gte: start, lt: end }, type: 'topup' },
-        _sum: { amount: true },
-      });
-      const totalRefunded = await this.prisma.transaction.aggregate({
-        where: { country, createdAt: { gte: start, lt: end }, type: 'refund' },
-        _sum: { amount: true },
-      });
-      const existing = await this.prisma.dailyStatistic.findFirst({
-        where: { date: start, country }
-      });
-      let stat;
-      if (existing) {
-        stat = await this.prisma.dailyStatistic.update({
-          where: { id: existing.id },
-          data: {
-            totalTopups,
-            totalAmount: totalAmount._sum.amount || 0,
-            totalRefunded: totalRefunded._sum.amount || 0,
-          }
-        });
-      } else {
-        stat = await this.prisma.dailyStatistic.create({
-          data: {
-            date: start,
-            country,
-            totalTopups,
-            totalAmount: totalAmount._sum.amount || 0,
-            totalRefunded: totalRefunded._sum.amount || 0,
-          }
-        });
-      }
-      stats.push(stat);
-    }
-    return stats;
-  }
-
-  async getStats({ date, country }: { date?: string; country?: string }) {
-    const where: any = {};
-    if (date) where.date = new Date(date);
-    if (country) where.country = country;
-    return this.prisma.dailyStatistic.findMany({ where, orderBy: { date: 'desc' } });
-  }
-
   async getSummary(query: StatisticsQueryDto) {
     const { startDate, endDate, country, operator } = query;
     const start = new Date(startDate);
     const end = new Date(endDate);
+    end.setDate(end.getDate() + 1);
     
     const where: any = {
       createdAt: {
         gte: start,
-        lte: end,
+        lt: end,
       },
-      type: 'topup',
+      type: 'TOPUP',
     };
 
     if (country) where.country = country;
@@ -88,7 +30,7 @@ export class StatisticsService {
         _sum: { amount: true },
       }),
       this.prisma.transaction.aggregate({
-        where: { ...where, type: 'refund' },
+        where: { ...where, type: 'REFUND' },
         _sum: { amount: true },
       }),
     ]);
@@ -105,13 +47,14 @@ export class StatisticsService {
     const { startDate, endDate, country } = query;
     const start = new Date(startDate);
     const end = new Date(endDate);
+    end.setDate(end.getDate() + 1);
     
     const where: any = {
       createdAt: {
         gte: start,
-        lte: end,
+        lt: end,
       },
-      type: 'topup',
+      type: 'TOPUP',
     };
 
     if (country) where.country = country;
@@ -127,10 +70,30 @@ export class StatisticsService {
       },
     });
 
-    return operators.map(op => ({
-      operator: op.operator,
-      totalTransactions: op._count.operator,
-      totalAmount: op._sum.amount || 0,
-    }));
+    // Lấy danh sách operator code
+    const operatorCodes = operators.map(op => op.operator);
+    // Lấy thông tin chi tiết từ bảng Operator
+    const operatorDetails = await this.prisma.operator.findMany({
+      where: { apiCode: { in: operatorCodes } },
+      select: {
+        id: true,
+        name: true,
+        logoUrl: true,
+        apiCode: true,
+        countryCode: true,
+        description: true,
+        color: true,
+      },
+    });
+
+    // Map lại kết quả trả về
+    return operators.map(op => {
+      const detail = operatorDetails.find(o => o.apiCode === op.operator);
+      return {
+        operator: detail || { apiCode: op.operator },
+        totalTransactions: op._count.operator,
+        totalAmount: op._sum.amount || 0,
+      };
+    });
   }
 } 

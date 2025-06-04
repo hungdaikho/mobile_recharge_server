@@ -1,8 +1,9 @@
-import { Controller, Post, Body, Get, Query, UseGuards, Headers, RawBodyRequest, Req } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, UseGuards, Headers, RawBodyRequest, Req, Put, Param } from '@nestjs/common';
 import { TransactionsService } from './transactions.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { CreateBulkTransactionDto } from './dto/create-bulk-transaction.dto';
+import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiQuery, ApiHeader } from '@nestjs/swagger';
 import { Request } from 'express';
 /**
@@ -88,5 +89,35 @@ export class TransactionsController {
       console.error('Webhook Error:', err.message);
       throw new Error(`Webhook Error: ${err.message}`);
     }
+  }
+
+  /**
+   * Cập nhật trạng thái giao dịch
+   * - Nhận ID giao dịch và trạng thái mới
+   * - Kiểm tra giao dịch có tồn tại không
+   * - Cập nhật trạng thái mới
+   * - Ghi log thay đổi trạng thái
+   * - Trả về giao dịch đã cập nhật
+   * 
+   * Các trạng thái có thể sử dụng:
+   * - PENDING: Đang xử lý
+   * - SUCCESS: Thành công
+   * - FAILED: Thất bại
+   * - REFUNDED: Đã hoàn tiền
+   */
+  @ApiOperation({ 
+    summary: 'Cập nhật trạng thái giao dịch',
+    description: 'Cập nhật trạng thái của một giao dịch theo ID. Các trạng thái có thể sử dụng: PENDING, SUCCESS, FAILED, REFUNDED'
+  })
+  @ApiBody({ 
+    type: UpdateTransactionDto,
+    description: 'Dữ liệu cập nhật trạng thái giao dịch'
+  })
+  @Put(':id')
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateTransactionDto
+  ) {
+    return this.transactionsService.updateTransaction(id, dto);
   }
 }
