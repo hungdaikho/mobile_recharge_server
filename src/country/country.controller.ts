@@ -12,7 +12,19 @@ export class CountryController {
   async findAll() {
     return this.countryService.findAll();
   }
-
+  @Public()
+  @Get('admin')
+  async findAllAdmin() {
+    return this.countryService.findAllAdmin();
+  }
+  @UseGuards(AuthGuard)
+  @Post(':code/active')
+  async updateCountryActive(
+    @Param('code') code: string,
+    @Body('active') active: boolean,
+  ) {
+    return this.countryService.updateCountryActive(code, active);
+  }
   @Post()
   @UseGuards(AuthGuard)
   async create(@Body() data: any) {

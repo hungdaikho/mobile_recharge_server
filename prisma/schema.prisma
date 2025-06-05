@@ -67,23 +67,68 @@ model NewsPost {
 }
 
 model Country {
-  code      String   @id
-  name      String
-  currency  String
-  flagUrl   String
-  operators Operator[]
+  code            String     @id
+  name            String
+  continent       String
+  currencyCode    String
+  currencyName    String
+  currencySymbol  String
+  flag            String
+  callingCodes    String[]
+  operators       Operator[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  active          Boolean   @default(false)
 }
 
 model Operator {
-  id           String    @id @default(uuid())
-  name         String
-  logoUrl      String
-  apiCode      String
-  countryCode  String
-  country      Country   @relation(fields: [countryCode], references: [code])
-  simTypes     SimType[]
-  description  String?
-  color String?
+  id                                String    @id @default(uuid())
+  operatorId                        Int       @unique
+  name                             String
+  bundle                           Boolean   @default(false)
+  data                             Boolean   @default(false)
+  pin                              Boolean   @default(false)
+  comboProduct                     Boolean   @default(false)
+  supportsLocalAmounts             Boolean   @default(false)
+  supportsGeographicalRechargePlans Boolean   @default(false)
+  denominationType                 String
+  senderCurrencyCode               String
+  senderCurrencySymbol             String
+  destinationCurrencyCode          String
+  destinationCurrencySymbol        String
+  commission                       Float
+  internationalDiscount            Float
+  localDiscount                    Float
+  mostPopularAmount                Float?
+  mostPopularLocalAmount           Float?
+  minAmount                        Float?
+  maxAmount                        Float?
+  localMinAmount                   Float?
+  localMaxAmount                   Float?
+  countryCode                      String
+  country                          Country   @relation(fields: [countryCode], references: [code])
+  fxRate                           Float
+  fxCurrencyCode                   String
+  logoUrls                         String[]
+  fixedAmounts                     Float[]
+  fixedAmountsDescriptions         Json
+  localFixedAmounts                Float[]
+  localFixedAmountsDescriptions    Json
+  suggestedAmounts                 Float[]
+  suggestedAmountsMap              Json
+  internationalFee                 Float     @default(0)
+  localFee                         Float     @default(0)
+  localPercentageFee              Float     @default(0)
+  internationalPercentageFee      Float     @default(0)
+  geographicalRechargePlans        Json      @default("[]")
+  promotions                       Json      @default("[]")
+  status                           String
+  color                            String?
+  simTypes                         SimType[]
+  createdAt                        DateTime  @default(now())
+  updatedAt                        DateTime  @updatedAt 
+  active                           Boolean   @default(false)
+  description                      String?
 }
 
 model SimType {

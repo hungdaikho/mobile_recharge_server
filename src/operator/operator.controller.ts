@@ -12,13 +12,21 @@ export class OperatorController {
   async findAll() {
     return this.operatorService.findAll();
   }
-
-  @Post()
   @UseGuards(AuthGuard)
-  async create(@Body() data: any) {
-    return this.operatorService.create(data);
+  @Get('admin')
+  async findAllAdmin() {
+    return this.operatorService.findAllAdmin();
   }
-
+  @Public()
+  @Get(':countryCode')
+  async findAllByCountryCode(@Param('countryCode') countryCode: string) {
+    return this.operatorService.findAllByCountryCode(countryCode);
+  }
+  @UseGuards(AuthGuard)
+  @Post()
+  async updateOperatorActive(@Body() data: any) {
+    return this.operatorService.updateOperatorActive(data.operatorId,data.active,data.color,data.description);
+  }
   @Put(':id')
   @UseGuards(AuthGuard)
   async update(@Param('id') id: string, @Body() data: any) {
