@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, UseGuards } from '@nestjs/common';
 import { ApiCredentialsService } from './api-credentials.service';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -35,7 +35,7 @@ export class ApiCredentialsController {
     return this.apiCredentialsService.findOne(id);
   }
 
-  @Patch(':id')
+  @Post(':id')
   update(
     @Param('id') id: string,
     @Body() updateApiCredentialDto: {
@@ -46,6 +46,7 @@ export class ApiCredentialsController {
       baseUrl?: string;
       isActive?: boolean;
       metadata?: any;
+      webhook?: string;
     },
   ) {
     return this.apiCredentialsService.update(id, updateApiCredentialDto);

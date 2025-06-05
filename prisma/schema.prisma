@@ -24,6 +24,7 @@ model Transaction {
   status         String
   type           String
   paymentMethod  String
+  metadata       Json?    // Store payment-related metadata like paymentIntentId
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
@@ -149,4 +150,11 @@ model ApiCredential {
   metadata    Json?    // Lưu thêm các thông tin khác nếu cần
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  webhook     String?  // Webhook URL
+}
+
+model FAQ {
+  id       String @id @default(uuid())
+  question String
+  solve    String
 }

@@ -45,6 +45,7 @@ export class ApiCredentialsService {
       baseUrl?: string;
       isActive?: boolean;
       metadata?: any;
+      webhook?: string;
     },
   ): Promise<ApiCredential> {
     return this.prisma.apiCredential.update({

@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as winston from 'winston';
+import { rawBodyMiddleware } from './common/middleware/raw-body.middleware';
 
 const logger = winston.createLogger({
   level: 'error',
@@ -24,8 +25,8 @@ process.on('unhandledRejection', (reason: any) => {
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.use(rawBodyMiddleware);
   app.enableCors();
-
   // Swagger setup
   const config = new DocumentBuilder()
     .setTitle('Mobile Recharge API')

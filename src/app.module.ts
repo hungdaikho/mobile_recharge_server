@@ -13,6 +13,8 @@ import { OperatorModule } from './operator/operator.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ApiCredentialsModule } from './api-credentials/api-credentials.module';
 import { InitDataReloadlyModule } from './init-data-reloadly/init-data-reloadly.module';
+import { StripeModule } from './stripe/stripe.module';
+import { FaqModule } from './faq/faq.module';
 
 @Module({
   imports: [
@@ -31,7 +33,9 @@ import { InitDataReloadlyModule } from './init-data-reloadly/init-data-reloadly.
     CountryModule,
     OperatorModule,
     ApiCredentialsModule,
-    InitDataReloadlyModule
+    InitDataReloadlyModule,
+    StripeModule,
+    FaqModule,
   ],
   controllers: [AppController],
   providers: [
