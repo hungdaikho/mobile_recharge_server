@@ -62,51 +62,66 @@ export class StripeService implements OnModuleInit {
     }
   
     try {
-      // ✅ B1: Tạo transaction trước
-      const transaction = await this.prismaService.transaction.create({
-        data: {
-          phoneNumber: dto.phoneNumber,
-          country: dto.country,
-          operator: dto.operator,
-          amount: dto.amount,
-          currency: dto.currency,
-          status: 'PENDING',
-          type: 'TOPUP',
-          paymentMethod: 'STRIPE'
-        }
-      });
-  
-      // ✅ B2: Tạo paymentIntent và nhúng transactionId vào metadata
+      // Tách phoneNumber và amount thành mảng nếu có nhiều giá trị
+      const phoneNumbers = dto.phoneNumber.split(';');
+      const amounts = dto.amount.split(';');
+      
+      if (phoneNumbers.length !== amounts.length) {
+        throw new TransactionException('Số lượng phoneNumber và amount không khớp', HttpStatus.BAD_REQUEST);
+      }
+
+      // Tạo transaction cho từng cặp phoneNumber-amount
+      const transactionIds: string[] = [];
+      for (let i = 0; i < phoneNumbers.length; i++) {
+        const transaction = await this.prismaService.transaction.create({
+          data: {
+            phoneNumber: phoneNumbers[i],
+            country: dto.country,
+            operator: dto.operator,
+            amount: Number(amounts[i]),
+            currency: dto.currency,
+            status: 'PENDING',
+            type: 'TOPUP',
+            paymentMethod: 'STRIPE'
+          }
+        });
+        transactionIds.push(transaction.id);
+      }
+
+      // Tạo paymentIntent với metadata.transactionId là chuỗi các id nối bằng ;
+      const transactionIdStr = transactionIds.join(';');
       const paymentIntent = await this.stripe.paymentIntents.create({
-        amount: dto.amount,
+        amount: Number(amounts.reduce((acc, cur) => acc + Number(cur), 0)),
         currency: dto.currency.toLowerCase(),
         payment_method_types: ['card'],
         metadata: {
-          transactionId: transaction.id, // 👈 Gắn ở đây để webhook sau này lấy ra được
+          transactionId: transactionIdStr, // Nối các id bằng ;
           phoneNumber: dto.phoneNumber,
           country: dto.country,
           operator: dto.operator
         }
       });
-  
-      // ✅ B3: Ghi log
-      await this.prismaService.activityLog.create({
-        data: {
-          phoneNumber: dto.phoneNumber,
-          action: 'CREATE_PAYMENT_INTENT',
-          metadata: {
-            transactionId: transaction.id,
-            paymentIntentId: paymentIntent.id,
-            amount: dto.amount,
-            currency: dto.currency
+
+      // Ghi log cho từng transaction
+      for (let i = 0; i < phoneNumbers.length; i++) {
+        await this.prismaService.activityLog.create({
+          data: {
+            phoneNumber: phoneNumbers[i],
+            action: 'CREATE_PAYMENT_INTENT',
+            metadata: {
+              transactionId: transactionIds[i],
+              paymentIntentId: paymentIntent.id,
+              amount: amounts[i],
+              currency: dto.currency
+            }
           }
-        }
-      });
-  
+        });
+      }
+
       return {
         clientSecret: paymentIntent.client_secret,
         paymentIntentId: paymentIntent.id,
-        transactionId: transaction.id
+        transactionId: transactionIdStr
       };
     } catch (error) {
       this.logger.error('Error creating payment intent:', error);

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNumber, IsNotEmpty, Min } from 'class-validator';
+import { IsString, IsNotEmpty } from 'class-validator';
 
 export class CreatePaymentDto {
   @ApiProperty({ example: '0986001234' })
@@ -17,11 +17,9 @@ export class CreatePaymentDto {
   @IsNotEmpty()
   operator: string;
 
-  @ApiProperty({ example: 50000 })
-  @IsNumber()
+  @ApiProperty({ example: '10000' })
   @IsNotEmpty()
-  @Min(10000)
-  amount: number;
+  amount: string;
 
   @ApiProperty({ example: 'VND', enum: ['VND', 'USD', 'EUR'] })
   @IsString()
