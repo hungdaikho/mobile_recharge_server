@@ -13,9 +13,8 @@ export class CreatePaymentDto {
   country: string;
 
   @ApiProperty({ example: 'VIETTEL' })
-  @IsString()
   @IsNotEmpty()
-  operator: string;
+  operator: number | string;
 
   @ApiProperty({ example: '10000' })
   @IsNotEmpty()

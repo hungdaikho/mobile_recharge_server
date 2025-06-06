@@ -90,21 +90,6 @@ export class TransactionsController {
       throw new Error(`Webhook Error: ${err.message}`);
     }
   }
-
-  /**
-   * Cập nhật trạng thái giao dịch
-   * - Nhận ID giao dịch và trạng thái mới
-   * - Kiểm tra giao dịch có tồn tại không
-   * - Cập nhật trạng thái mới
-   * - Ghi log thay đổi trạng thái
-   * - Trả về giao dịch đã cập nhật
-   * 
-   * Các trạng thái có thể sử dụng:
-   * - PENDING: Đang xử lý
-   * - SUCCESS: Thành công
-   * - FAILED: Thất bại
-   * - REFUNDED: Đã hoàn tiền
-   */
   @ApiOperation({ 
     summary: 'Cập nhật trạng thái giao dịch',
     description: 'Cập nhật trạng thái của một giao dịch theo ID. Các trạng thái có thể sử dụng: PENDING, SUCCESS, FAILED, REFUNDED'

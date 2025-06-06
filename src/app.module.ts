@@ -15,6 +15,8 @@ import { ApiCredentialsModule } from './api-credentials/api-credentials.module';
 import { InitDataReloadlyModule } from './init-data-reloadly/init-data-reloadly.module';
 import { StripeModule } from './stripe/stripe.module';
 import { FaqModule } from './faq/faq.module';
+import { ReloadlyModule } from './reloadly/reloadly.module';
+import { StatisticModule } from './statistic/statistic.module';
 
 @Module({
   imports: [
@@ -36,6 +38,8 @@ import { FaqModule } from './faq/faq.module';
     InitDataReloadlyModule,
     StripeModule,
     FaqModule,
+    ReloadlyModule,
+    StatisticModule,
   ],
   controllers: [AppController],
   providers: [

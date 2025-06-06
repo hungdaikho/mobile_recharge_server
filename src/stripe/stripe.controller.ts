@@ -6,6 +6,7 @@ import { Request } from 'express';
 import Stripe from 'stripe';
 import { PrismaService } from '../prisma/prisma.service';
 import { Public } from 'src/auth/decorators/public.decorator';
+import { ReloadlyService, TopupRequest } from 'src/reloadly/reloadly.service';
 
 @ApiTags('stripe')
 @Controller('stripe')
@@ -13,6 +14,7 @@ export class StripeController {
   constructor(
     private readonly stripeService: StripeService,
     private readonly prisma: PrismaService,
+    private readonly reloadLyService: ReloadlyService
   ) {}
 
   @ApiOperation({ summary: 'Create a new payment intent' })
@@ -67,20 +69,36 @@ export class StripeController {
         sig,
         stripeCredential.webhook
       );
-
       // Tách biệt từng event
       const eventObject = event.data.object as any;
-      console.log(eventObject)
       const id = eventObject.id;
-
       switch (event.type) {
+        
         case 'payment_intent.succeeded':
-          console.log('[Stripe] Payment succeeded:', { id, event: event.type });
+          const data:any = {
+            operatorId: eventObject.metadata.operator,
+            amount: eventObject.amount,
+            useLocalAmount: false,
+            recipientPhone: {
+              countryCode: eventObject.metadata.country,
+              number: eventObject.metadata.phoneNumber
+            },
+            transactionId: eventObject.metadata.transactionId
+          }
+          this.reloadLyService.createTopupReloadly(data);
           break;
         case 'payment_intent.payment_failed':
+          this.prisma.transaction.update({
+            where: { id: eventObject.metadata.transactionId },
+            data: { status: 'FAILED' }
+          })
           console.log('[Stripe] Payment failed:', { id, event: event.type });
           break;
         case 'payment_intent.partially_funded':
+          this.prisma.transaction.update({
+            where: { id: eventObject.metadata.transactionId },
+            data: { status: 'FAILED' }
+          })
           console.log('[Stripe] Payment partially funded:', { id, event: event.type });
           break;
         default:

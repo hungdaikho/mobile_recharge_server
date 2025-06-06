@@ -77,7 +77,7 @@ export class StripeService implements OnModuleInit {
           data: {
             phoneNumber: phoneNumbers[i],
             country: dto.country,
-            operator: dto.operator,
+            operator: String(dto.operator),
             amount: Number(amounts[i]),
             currency: dto.currency,
             status: 'PENDING',
@@ -90,8 +90,9 @@ export class StripeService implements OnModuleInit {
 
       // Tạo paymentIntent với metadata.transactionId là chuỗi các id nối bằng ;
       const transactionIdStr = transactionIds.join(';');
+      const totalAmount = Math.ceil(amounts.reduce((acc, cur) => acc + Number(cur), 0));
       const paymentIntent = await this.stripe.paymentIntents.create({
-        amount: Number(amounts.reduce((acc, cur) => acc + Number(cur), 0)),
+        amount: totalAmount,
         currency: dto.currency.toLowerCase(),
         payment_method_types: ['card'],
         metadata: {
